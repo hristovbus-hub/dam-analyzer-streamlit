@@ -54,3 +54,20 @@ if uploaded_file:
     best = find_best_three(intervals)
 
     if best:
+        total_avg, a, b, c = best
+
+        st.subheader(f"📊 Обща средна цена: **{total_avg:.2f} EUR/MWh**")
+
+        for idx, interval in enumerate([a, b, c], start=1):
+            start, end, length, avg = interval
+            start_time, end_time = interval_to_time(start, end)
+
+            st.markdown(f"""
+            ### 🔹 Период {idx}
+            - QH: **{start} → {end}**
+            - Часове: **{start_time} – {end_time}**
+            - Продължителност: **{length} QH**
+            - Средна цена: **{avg:.2f} EUR/MWh**
+            """)
+    else:
+        st.error("❌ Не може да се намери комбинация от 3 периода с общо 12 QH.")
