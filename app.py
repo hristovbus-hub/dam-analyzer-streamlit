@@ -16,9 +16,23 @@ def interval_to_time(start, end):
 def load_prices_from_csv(uploaded_file):
     prices = {}
     df = pd.read_csv(uploaded_file, sep=None, engine="python")
+st.write("Колони в файла:", df.columns.tolist())
     for _, row in df.iterrows():
         if isinstance(row["Продукт"], str) and row["Продукт"].startswith("QH"):
-            qh = int(row["Продукт"].split()[1])
+            qh_col = [col for col in df.columns if "QH" in col or "Продукт" in col or "Produkt" in col]
+price_col = [col for col in df.columns if "цена" in col.lower() or "EUR" in col]
+
+if qh_col and price_col:
+    for _, row in df.iterrows():
+        try:
+            qh = int(str(row[qh_col[0]]).split()[1])
+            price = float(str(row[price_col[0]]).replace(",", "."))
+            prices[qh] = price
+        except:
+            continue
+else:
+    st.error("Не мога да намеря колоните за QH и цена.")
+    st.stop()
             price = float(str(row["Цена (EUR/MWh)"]).replace(",", "."))
             prices[qh] = price
     return prices
