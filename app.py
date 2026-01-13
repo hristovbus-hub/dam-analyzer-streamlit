@@ -15,7 +15,7 @@ def interval_to_time(start, end):
 
 def load_prices_from_csv(uploaded_file):
     prices = {}
-    df = pd.read_csv(uploaded_file, sep=";")
+    df = pd.read_csv(uploaded_file, sep=None, engine="python")
     for _, row in df.iterrows():
         if isinstance(row["Продукт"], str) and row["Продукт"].startswith("QH"):
             qh = int(row["Продукт"].split()[1])
