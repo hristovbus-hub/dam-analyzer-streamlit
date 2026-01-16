@@ -1,87 +1,65 @@
-import streamlit as st
-import pandas as pd
-from itertools import combinations
+import itertools
+import numpy as np
 
-st.title("DAM Analyzer – Топ 3 периода (общо 3 часа)")
+TOTAL_QH = 11  # 2 часа и 45 минути
 
-def qh_to_time(qh):
-    minutes = (qh - 1) * 15
-    h = minutes // 60
-    m = minutes % 60
-    return f"{h:02d}:{m:02d}"
+def generate_combinations(total):
+    combos = []
 
-def interval_to_time(start, end):
-    return qh_to_time(start), qh_to_time(end + 1)
+    # 1 период
+    combos.append([total])
 
-def load_prices_from_csv(uploaded_file):
-    prices = {}
-    df = pd.read_csv(uploaded_file, sep=None, engine="python")
-st.write("Колони в файла:", df.columns.tolist())
-    for _, row in df.iterrows():
-        if isinstance(row["Продукт"], str) and row["Продукт"].startswith("QH"):
-            qh_col = [col for col in df.columns if "QH" in col or "Продукт" in col or "Produkt" in col]
-price_col = [col for col in df.columns if "цена" in col.lower() or "EUR" in col]
+    # 2 периода
+    for a in range(1, total):
+        b = total - a
+        combos.append([a, b])
 
-if qh_col and price_col:
-    for _, row in df.iterrows():
-        try:
-            qh = int(str(row[qh_col[0]]).split()[1])
-            price = float(str(row[price_col[0]]).replace(",", "."))
-            prices[qh] = price
-        except:
-            continue
-else:
-    st.error("Не мога да намеря колоните за QH и цена.")
-    st.stop()
-            price = float(str(row["Цена (EUR/MWh)"]).replace(",", "."))
-            prices[qh] = price
-    return prices
+    # 3 периода
+    for a in range(1, total - 1):
+        for b in range(1, total - a):
+            c = total - a - b
+            combos.append([a, b, c])
 
-def all_intervals(prices):
-    intervals = []
-    qhs = sorted(prices.keys())
-    for start in qhs:
-        for end in qhs:
-            if end >= start:
-                interval = list(range(start, end + 1))
-                avg_price = sum(prices[q] for q in interval) / len(interval)
-                intervals.append((start, end, len(interval), avg_price))
-    return intervals
+    return combos
 
-def find_best_three(intervals):
-    best = None
-    for a, b, c in combinations(intervals, 3):
-        total_len = a[2] + b[2] + c[2]
-        if total_len == 12:
-            # check no overlap
-            if max(a[0], b[0], c[0]) > min(a[1], b[1], c[1]):
-                total_avg = (a[3]*a[2] + b[3]*b[2] + c[3]*c[2]) / 12
-                if best is None or total_avg > best[0]:
-                    best = (total_avg, a, b, c)
-    return best
 
-uploaded_file = st.file_uploader("📤 Качи DAM CSV файл", type=["csv"])
+def find_best_periods(prices):
+    best_avg = -1
+    best_result = None
 
-if uploaded_file:
-    prices = load_prices_from_csv(uploaded_file)
-    intervals = all_intervals(prices)
-    best = find_best_three(intervals)
+    combos = generate_combinations(TOTAL_QH)
 
-    if best:
-        total_avg, a, b, c = best
+    for combo in combos:
+        # пример: combo = [3, 4, 4]
+        # трябва да намерим най-добрите позиции за тези дължини
 
-        st.subheader(f"📊 Обща средна цена: **{total_avg:.2f} EUR/MWh**")
+        # всички възможни стартови позиции за първия период
+        for starts in itertools.combinations(range(len(prices)), len(combo)):
+            # проверка за валидност (да не се застъпват)
+            valid = True
+            periods = []
+            current_end = -1
 
-        for idx, interval in enumerate([a, b, c], start=1):
-            start, end, length, avg = interval
-            start_time, end_time = interval_to_time(start, end)
+            for length, start in zip(combo, starts):
+                end = start + length
+                if start <= current_end:
+                    valid = False
+                    break
+                if end > len(prices):
+                    valid = False
+                    break
+                periods.append((start, end))
+                current_end = end
 
-            st.markdown(f"""
-            ### 🔹 Период {idx}
-            - QH: **{start} → {end}**
-            - Часове: **{start_time} – {end_time}**
-            - Продължителност: **{length} QH**
-            - Средна цена: **{avg:.2f} EUR/MWh**
-            """)
-    else:
-        st.error("❌ Не може да се намери комбинация от 3 периода с общо 12 QH.")
+            if not valid:
+                continue
+
+            # изчисляваме средната цена
+            total_sum = sum(np.sum(prices[s:e]) for s, e in periods)
+            avg_price = total_sum / TOTAL_QH
+
+            if avg_price > best_avg:
+                best_avg = avg_price
+                best_result = periods
+
+    return best_result, best_avg
